@@ -1,1 +1,383 @@
-<p> hello</p>
+<div id="math-game-en" style="width:100%; max-width:900px; margin:auto; font-family:sans-serif;">
+
+<style>
+#math-game-en * { box-sizing:border-box; user-select:none; }
+
+#math-game-en .header {
+    height:48px;
+    background:#333;
+    color:#fff;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:0 12px;
+    font-size:14px;
+}
+
+#math-game-en .controls {
+    background: #f4f4f4;
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    font-size: 14px;
+    border-bottom: 2px solid #ddd;
+}
+
+#math-game-en .controls label {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+#math-game-en .controls button {
+    width: auto;
+    padding: 6px 12px;
+    margin: 0;
+    font-size: 13px;
+    background: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#math-game-en .board {
+    display:flex;
+    flex-direction:column;
+}
+
+#math-game-en .area {
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:8px;
+    padding:10px;
+}
+
+#math-game-en #bottom {
+    border-top: 2px dashed #ccc;
+}
+
+#math-game-en .card {
+    width:100%;
+    cursor:pointer;
+    border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.15);
+}
+
+#math-game-en .card-inner-wrapper {
+    position:relative;
+    width:100%;
+    padding-bottom:55%;
+}
+
+#math-game-en .inner {
+    position:absolute;
+    top:0; left:0;
+    width:100%;
+    height:100%;
+    transform-style:preserve-3d;
+    transition:0.25s;
+    border-radius:8px;
+}
+
+#math-game-en .flipped .inner {
+    transform:rotateY(180deg);
+}
+
+#math-game-en .front,
+#math-game-en .back {
+    position:absolute;
+    top:0; left:0;
+    width:100%;
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+    padding:4px;
+    backface-visibility:hidden;
+    -webkit-backface-visibility:hidden;
+    border-radius:8px;
+    font-weight:normal;
+}
+
+#math-game-en .math-text {
+    font-family: "Times New Roman", Times, serif;
+    font-size: clamp(12px, 3vw, 18px);
+    letter-spacing: 0.5px;
+    white-space: nowrap; 
+}
+
+#math-game-en .math-text i {
+    font-style: italic;
+}
+
+#math-game-en #top .front { background:#BBDEFB; color:#0D47A1; font-weight:bold; }
+#math-game-en #bottom .front { background:#FFE0B2; color:#E65100; font-weight:bold; }
+
+#math-game-en .back {
+    background:white;
+    transform:rotateY(180deg);
+}
+
+#math-game-en #top .back { color:#1565C0; }
+#math-game-en #bottom .back { color:#E65100; }
+
+#math-game-en .matched {
+    opacity:0;
+    transform:scale(0);
+    transition:0.25s;
+}
+
+#math-game-en .modal {
+    display:none;
+    position:absolute;
+    top:0; left:0;
+    width:100%;
+    height:100%;
+    background:rgba(0,0,0,0.6);
+    justify-content:center;
+    align-items:flex-start; 
+    padding-top: 25px; 
+    z-index: 10;
+}
+
+#math-game-en .modal-content {
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    width:90%;
+    max-width:380px;
+    text-align:center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+#math-game-en .modal-math {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 18px;
+    margin: 10px 0;
+}
+
+#math-game-en button#btn {
+    width:100%;
+    padding:10px;
+    background:#4CAF50;
+    color:white;
+    border:none;
+    border-radius:6px;
+    font-size:16px;
+    cursor: pointer;
+    margin-top: 15px;
+}
+</style>
+
+<div class="header">
+    <div>Expansion & Factorization</div>
+    <div>Time: <span id="t">0</span>s　Misses: <span id="m">0</span></div>
+</div>
+
+<div class="controls">
+    <label><input type="radio" name="pairCount" value="3"> 3 Pairs</label>
+    <label><input type="radio" name="pairCount" value="6" checked> 6 Pairs</label>
+    <button id="reset-btn">Restart</button>
+</div>
+
+<div class="board">
+    <div class="area" id="top"></div>
+    <div class="area" id="bottom"></div>
+</div>
+
+<div class="modal" id="modal">
+    <div class="modal-content">
+        <h3 id="mt" style="margin-top:0; margin-bottom:15px;"></h3>
+        <div id="txt"></div>
+        <button id="btn">Next</button>
+    </div>
+</div>
+
+<script>
+(function(){
+
+let topSel=null, botSel=null, lock=false, modalOpen=false;
+let miss=0, match=0, start=null, timer;
+let currentPairCount = 6;
+
+const top=document.querySelector('#math-game-en #top');
+const bottom=document.querySelector('#math-game-en #bottom');
+const modal=document.querySelector('#math-game-en #modal');
+const mt=document.querySelector('#math-game-en #mt');
+const txt=document.querySelector('#math-game-en #txt');
+const btn=document.querySelector('#math-game-en #btn');
+const resetBtn=document.querySelector('#math-game-en #reset-btn');
+
+function shuffle(a){ return a.sort(()=>Math.random()-0.5); }
+
+const x = '<i>x</i>';
+
+function formatFactored(a, b) {
+    if (a === 0 && b === 0) return `${x}<sup>2</sup>`;
+    if (a === b) return `(${x}${a < 0 ? a : '+'+a})<sup>2</sup>`;
+    if (a === 0) return `${x}(${x}${b < 0 ? b : '+'+b})`;
+    if (b === 0) return `${x}(${x}${a < 0 ? a : '+'+a})`;
+    
+    let strA = a < 0 ? a : `+${a}`;
+    let strB = b < 0 ? b : `+${b}`;
+    return `(${x}${strA})(${x}${strB})`;
+}
+
+function formatExpanded(sum, prod) {
+    let str = `${x}<sup>2</sup>`;
+    
+    if (sum === 1) str += ` + ${x}`;
+    else if (sum === -1) str += ` - ${x}`;
+    else if (sum > 0) str += ` + ${sum}${x}`;
+    else if (sum < 0) str += ` - ${Math.abs(sum)}${x}`;
+
+    if (prod > 0) str += ` + ${prod}`;
+    else if (prod < 0) str += ` - ${Math.abs(prod)}`;
+
+    return str;
+}
+
+function generateData(count) {
+    const data = [];
+    for(let i = 0; i < count; i++) {
+        let a = Math.floor(Math.random() * 25) - 12;
+        let b = Math.floor(Math.random() * 25) - 12;
+        if (a > b) { let temp = a; a = b; b = temp; }
+        let sum = a + b;
+        let prod = a * b;
+        data.push({
+            a: a, b: b, sum: sum, prod: prod,
+            facHTML: formatFactored(a, b),
+            expHTML: formatExpanded(sum, prod)
+        });
+    }
+    return data;
+}
+
+function card(d, type){
+    let c=document.createElement('div');
+    c.className='card';
+    let wrapper=document.createElement('div');
+    wrapper.className='card-inner-wrapper';
+    let i=document.createElement('div');
+    i.className='inner';
+    let f=document.createElement('div');
+    f.className='front';
+    f.textContent = type === 'exp' ? 'Expand' : 'Factor';
+    let b=document.createElement('div');
+    b.className='back math-text'; 
+    b.innerHTML = type === 'exp' ? d.expHTML : d.facHTML; 
+
+    i.appendChild(f); i.appendChild(b);
+    wrapper.appendChild(i); c.appendChild(wrapper);
+
+    c.onclick=()=>{
+        if(lock||modalOpen) return;
+        if(!start){
+            start=Date.now();
+            timer=setInterval(()=>{
+                document.getElementById('t').textContent = Math.floor((Date.now()-start)/1000);
+            },250);
+        }
+        c.classList.add('flipped');
+        if(type==='exp'){
+            if(topSel) topSel.c.classList.remove('flipped');
+            topSel={c,d};
+        }else{
+            if(botSel) botSel.c.classList.remove('flipped');
+            botSel={c,d};
+        }
+
+        if(topSel && botSel){
+            lock=true;
+            setTimeout(()=>{
+                const fmt = (n) => n < 0 ? `(${n})` : n;
+                if(topSel.d.sum === botSel.d.sum && topSel.d.prod === botSel.d.prod){
+                    show(
+                        'Correct!',
+                        `<div style="font-size:1.1em; line-height:1.6;">`+
+                        `<b>${topSel.d.a} + ${fmt(topSel.d.b)} = ${topSel.d.sum}</b><br>`+
+                        `<b>${topSel.d.a} &times; ${fmt(topSel.d.b)} = ${topSel.d.prod}</b><br>`+
+                        `</div>`+
+                        `<div style="margin-top:10px;">Therefore...</div>`+
+                        `<div class="modal-math"><b>${topSel.d.expHTML} ＝ ${topSel.d.facHTML}</b></div>`,
+                        ()=>{
+                            topSel.c.classList.add('matched');
+                            botSel.c.classList.add('matched');
+                            match++;
+                            reset();
+                            if(match===currentPairCount) end();
+                        }
+                    );
+                }else{
+                    miss++;
+                    document.getElementById('m').textContent=miss;
+                    show(
+                        'Not a Match',
+                        `<div style="font-size:1em; text-align:left; display:inline-block; line-height:1.4;">`+
+                        `<b>${topSel.d.a} + ${fmt(topSel.d.b)} = ${topSel.d.sum}</b><br>`+
+                        `<b>${topSel.d.a} &times; ${fmt(topSel.d.b)} = ${topSel.d.prod}</b><br>`+
+                        `So...<br><div class="modal-math" style="margin:4px 0;">${topSel.d.expHTML} ＝ ${topSel.d.facHTML}</div>`+
+                        `<hr style="border:0; border-top:1px dashed #ccc; margin:12px 0;">`+
+                        `<b>${botSel.d.a} + ${fmt(botSel.d.b)} = ${botSel.d.sum}</b><br>`+
+                        `<b>${botSel.d.a} &times; ${fmt(botSel.d.b)} = ${botSel.d.prod}</b><br>`+
+                        `So...<br><div class="modal-math" style="margin:4px 0;">${botSel.d.expHTML} ＝ ${botSel.d.facHTML}</div>`+
+                        `</div>`,
+                        ()=>{
+                            topSel.c.classList.remove('flipped');
+                            botSel.c.classList.remove('flipped');
+                            reset();
+                        }
+                    );
+                }
+            },500);
+        }
+    };
+    return c;
+}
+
+function reset(){ topSel=null; botSel=null; lock=false; }
+
+function show(t,body,cb){
+    modalOpen=true;
+    mt.textContent=t;
+    txt.innerHTML=body;
+    modal.style.display='flex';
+    btn.onclick=()=>{
+        modal.style.display='none';
+        modalOpen=false;
+        cb();
+    };
+}
+
+function end(){
+    clearInterval(timer);
+    show('Clear!',`<div style="margin:10px 0; font-size:18px;">Time: <b>${document.getElementById('t').textContent}</b>s<br>Misses: <b>${miss}</b></div>Well done!`, init);
+}
+
+function init(){
+    topSel=null; botSel=null;
+    match=0; miss=0;
+    document.getElementById('m').textContent=0;
+    document.getElementById('t').textContent=0;
+    if(timer) clearInterval(timer);
+    start=null;
+    const radios = document.getElementsByName('pairCount');
+    for (let r of radios) { if (r.checked) currentPairCount = parseInt(r.value); }
+
+    let gameData = generateData(currentPairCount);
+    top.innerHTML=''; bottom.innerHTML='';
+    shuffle([...gameData]).forEach(d=>top.appendChild(card(d,'exp')));
+    shuffle([...gameData]).forEach(d=>bottom.appendChild(card(d,'fac')));
+}
+
+resetBtn.onclick = init;
+init();
+
+})();
+</script>
+
+</div>
